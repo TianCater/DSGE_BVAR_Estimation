@@ -1,0 +1,206 @@
+---
+title: "data_import"
+output: html_document
+date: "2022-10-16"
+---
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+ pacman::p_load(devtools, fredr, purrr, dplyr, writexl, tidyr, ggplot2, fmxdat)
+
+
+```
+
+```{r}
+
+fredr_series_search_text("real GDP")
+
+fred_api_key <- fredr_set_key("d3c88549b884b18ff71b2541742bd179")
+
+fredr_has_key()
+
+```
+
+```{r}
+
+real_gdp <- fredr(
+  series_id = "NAEXKP01USQ661S",
+  observation_start = as.Date("1983-01-01"),
+  observation_end = as.Date("2021-12-31"),
+  units = "pch"
+ )
+
+
+```
+
+```{r}
+
+gdp_deflator <- fredr(
+  series_id = "USAGDPDEFQISMEI",
+  observation_start = as.Date("1983-01-01"),
+  observation_end = as.Date("2021-12-31")
+ )
+
+```
+
+```{r}
+ln_real_gdp <-fredr(
+  series_id = "NAEXKP01USQ661S",
+  observation_start = as.Date("1983-01-01"),
+  observation_end = as.Date("2021-12-31"),
+  units = "log"
+ )
+
+```
+
+```{r}
+ln_gdp_deflator <- fredr(
+  series_id = "USAGDPDEFQISMEI",
+  observation_start = as.Date("1983-01-01"),
+  observation_end = as.Date("2021-12-31"),
+  units = "log"
+ )
+
+```
+
+
+```{r}
+
+active_population_level <- fredr(
+    series_id = "LFAC64TTUSQ647S",
+    observation_start = as.Date("1983-01-01"),
+    observation_end = as.Date("2021-12-31")
+    )
+
+
+```
+
+
+```{r}
+
+effective_federal_funds_rate <- fredr( #2022-04-01
+    series_id = "BOGZ1FL072052006Q",
+    observation_start = as.Date("1983-01-01"),
+    observation_end = as.Date("2021-12-31")
+    )
+
+```
+
+
+```{r}
+df <- inner_join(ln_real_gdp,ln_gdp_deflator,  by= "date")
+
+df1 <- df |> 
+    select(date, value.x, value.y) |> 
+    rename(lnrealgdp = value.x,
+            lngdpdefl = value.y) 
+    
+    
+    
+```
+
+```{r}
+dfr <- inner_join(effective_federal_funds_rate,active_population_level,  by= "date")
+
+dfr1 <- dfr |> 
+    select(date, value.x, value.y) |> 
+    rename( FFR = value.x,
+            Population = value.y)
+
+```     
+
+
+
+
+```{r}
+realGDP_growth_pc <-  fredr(  #2022-04-01
+    series_id = "A939RX0Q048SBEA",
+    observation_start = as.Date("1983-01-01"),
+    observation_end = as.Date("2021-12-31"),
+    units = "pch"
+    )
+
+m2_growth <-  fredr(
+    series_id = "WM2NS",
+    observation_start = as.Date("1983-01-01"),
+    observation_end = as.Date("2021-12-31"),
+    frequency = "q",
+    units = "pch")
+     
+
+```
+
+```{r}
+df6 <- inner_join(realGDP_growth_pc, ln_gdp_deflator, by= "date")
+
+df7 <- df6 |> select(date, value.x, value.y)|> rename( GDPgrowth = value.x, lGDPdefl = value.y) 
+    
+df8 <- inner_join(df7, effective_federal_funds_rate, by = "date")
+
+
+
+df9 <- df8 |> select(date, GDPgrowth, lGDPdefl, value) |> rename( effFFR = value)
+
+df10 <- df9 |> mutate(inflEST = lGDPdefl*100 - lag(lGDPdefl*100))
+
+df11 <- inner_join(df10, m2_growth, by = "date") |> rename(M2growth = value) |> select(date, GDPgrowth, inflEST, effFFR , M2growth)
+
+
+```
+
+
+```{r, time series plot}
+
+
+#{r Figure3,  warning =  FALSE, fig.align = 'left', fig.cap = "US and Brazil Inflation Rates \\label{A1}", fig.ext = 'pdf', fig.height = 6, fig.width = 7.5,results='asis'}
+
+series_plot <- df11 |> rename( "Real GDP growth per quarter"= GDPgrowth, "Effective Federal Funds Rate (FFR) (annualized)"=effFFR, "Inflation: quarterly changes in the log of the GDP deflator"=inflEST, "Nominal money growth per quarter: Divisia M2 index"=M2growth) |> pivot_longer(cols=2:5, names_to ="series", values_to = "values") |> 
+
+     ggplot() + 
+  
+  geom_line(aes(date, values), size = 1, alpha = 0.9)  +
+    
+
+    annotate("rect", xmin = lubridate::ymd("19900701"), xmax = lubridate::ymd("19910301"), ymin = -Inf, ymax = Inf,alpha = .2, fill='blue', alpha= 0.1) +
+    annotate("rect", xmin = lubridate::ymd("20010301"), xmax = lubridate::ymd("20011101"), ymin = -Inf, ymax = Inf,alpha = .2, fill='blue', alpha= 0.1) +
+     annotate("rect", xmin = lubridate::ymd("20071201"), xmax = lubridate::ymd("20090601"), ymin = -Inf, ymax = Inf,alpha = .2, fill='blue', alpha= 0.1) +
+    annotate("rect", xmin = lubridate::ymd("20200101"), xmax = lubridate::ymd("20200401"), ymin = -Inf, ymax = Inf,alpha = .2, fill='blue', alpha= 0.1) +
+     annotate("rect", xmin = lubridate::ymd("20090101"), xmax = lubridate::ymd("20160101"), ymin = -Inf, ymax = Inf,alpha = .2, fill='red', alpha= 0.1) +
+
+    facet_wrap(~series, scales = "free_y", ncol = 1) +
+     
+  
+  # Nice clean theme, with many additions that are now simplified (explore this yourself):
+  # E.g. using fmxdat::ggpts, we can change the sizes more easily in millimeters. 
+  # theme_fmx also offers simplified size settings, as e.g. below:
+  
+ fmxdat::theme_fmx(title.size = ggpts(0), 
+                    subtitle.size = ggpts(0),
+                    caption.size = ggpts(20),
+                    # Makes nicer caption. If no caption given, this will break function, so careful:
+                    CustomCaption = T)  + 
+  
+  # crisp colours:
+  fmxdat::fmx_cols() + 
+  
+  labs(x = "", y = "%", caption = "Source:  Federal Reserve Bank of St. Louis’ FRED database \nNote:  The blue shaded areas reflect economic recessions as defined by the NBER, whereas the red shaded is the period when the FED was constrained by the ZLB.",
+       title = "",
+       subtitle = "")
+  
+# Finplot now adds finishing touches easily:
+
+  fmxdat::finplot(series_plot, x.vert = T, x.date.type = "%Y", x.date.dist = "2 years")
+
+
+
+
+
+
+
+```
+
+
