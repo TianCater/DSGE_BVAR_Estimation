@@ -2,7 +2,7 @@ README
 ================
 2023-05-09
 
-### The final project PDF can be viewed [HERE](https://github.com/TianCater/ATS_BVAR_Project_19025831/blob/main/19025831/19025831.pdf) in the repo above.
+### The final project PDF can be viewed [HERE](https://github.com/TianCater/DSGE_BVAR_Estimation/blob/main/R_markdown_ts_dsge_bvar/R_project.pdf) in the repo above.
 
 ## Purpose
 
